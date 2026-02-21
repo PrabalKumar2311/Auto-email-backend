@@ -4,18 +4,22 @@ const nodemailer = require("nodemailer");
 require("dotenv").config();
 
 const app = express();
-const PORT = 8000;
+
+/* ================= PORT (RENDER SAFE) ================= */
+
+const PORT = process.env.PORT || 8000;
 
 /* ================= MIDDLEWARE ================= */
 
 app.use(
   cors({
     origin: [
-      "http://localhost:5173", // local development
+      "http://localhost:5173", // local frontend
       "https://prabal-kumar-portfolio.netlify.app", // production frontend
     ],
   })
 );
+
 app.use(express.json());
 
 /* ================= EMAIL CONFIG ================= */
@@ -28,10 +32,10 @@ const transporter = nodemailer.createTransport({
   },
 });
 
-/* ================= ROUTES ================= */
+/* ================= HEALTH ROUTE ================= */
 
 app.get("/", (req, res) => {
-  // res.send("I am a server 🚀");
+  res.send("Backend running 🚀");
 });
 
 /* ================= CONTACT API ================= */
@@ -39,7 +43,8 @@ app.get("/", (req, res) => {
 app.post("/contact", async (req, res) => {
   const { name, email, message } = req.body;
 
-  // validation
+  /* ===== VALIDATION ===== */
+
   if (!name || !email || !message) {
     return res.status(400).json({
       success: false,
@@ -56,45 +61,55 @@ app.post("/contact", async (req, res) => {
   }
 
   try {
-    /* ================= EMAIL TO YOU ================= */
+    /* ===== EMAIL TO YOU ===== */
 
-    await transporter.sendMail({
-      from: `"${name} via Portfolio" <${process.env.EMAIL_USER}>`,
-      replyTo: email, // ← IMPORTANT (reply goes to user)
-      to: process.env.RECEIVER_EMAIL,
-      subject: `Portfolio Message from ${name}`,
-      text: `
-      Name: ${name}
-      Email: ${email}
+    await Promise.race([
+      transporter.sendMail({
+        from: `"${name} via Portfolio" <${process.env.EMAIL_USER}>`,
+        replyTo: email,
+        to: process.env.RECEIVER_EMAIL,
+        subject: `Portfolio Message from ${name}`,
+        text: `
+Name: ${name}
+Email: ${email}
 
-      Message:
-      ${message}
-      `,
-    });
+Message:
+${message}
+        `,
+      }),
+      new Promise((_, reject) =>
+        setTimeout(() => reject(new Error("Mail timeout")), 15000)
+      ),
+    ]);
 
-    /* ================= AUTO REPLY TO USER ================= */
+    /* ===== AUTO REPLY TO USER ===== */
 
-    await transporter.sendMail({
-      from: `"Prabal Kumar" <${process.env.EMAIL_USER}>`,
-      to: email,
-      subject: "Thanks for reaching out 👋",
-      text: `
-      Hi ${name},
+    await Promise.race([
+      transporter.sendMail({
+        from: `"Prabal Kumar" <${process.env.EMAIL_USER}>`,
+        to: email,
+        subject: "Thanks for reaching out 👋",
+        text: `
+Hi ${name},
 
-      Thanks for contacting me! I’ve received your message and will get back to you soon.
+Thanks for contacting me! I’ve received your message and will get back to you soon.
 
-      Here’s a copy of your message:
+Here’s a copy of your message:
 
-      "${message}"
+"${message}"
 
-      Best regards,
-      Prabal Kumar
-      `,
-    });
+Best regards,
+Prabal Kumar
+        `,
+      }),
+      new Promise((_, reject) =>
+        setTimeout(() => reject(new Error("Mail timeout")), 15000)
+      ),
+    ]);
 
     res.json({ success: true });
   } catch (error) {
-    console.log("Mail error:", error);
+    console.error("Mail error:", error.message);
 
     res.status(500).json({
       success: false,
@@ -106,5 +121,5 @@ app.post("/contact", async (req, res) => {
 /* ================= START SERVER ================= */
 
 app.listen(PORT, () => {
-  // console.log(`I am live on port ${PORT}`);
+  console.log(`Server running on port ${PORT}`);
 });
