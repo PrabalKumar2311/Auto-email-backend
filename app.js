@@ -8,7 +8,14 @@ const PORT = 8000;
 
 /* ================= MIDDLEWARE ================= */
 
-app.use(cors());
+app.use(
+  cors({
+    origin: [
+      "http://localhost:5173", // local development
+      "https://prabal-kumar-portfolio.netlify.app", // production frontend
+    ],
+  })
+);
 app.use(express.json());
 
 /* ================= EMAIL CONFIG ================= */
