@@ -1,36 +1,27 @@
 const express = require("express");
 const cors = require("cors");
-const nodemailer = require("nodemailer");
+const { Resend } = require("resend");
 require("dotenv").config();
 
 const app = express();
-
-/* ================= PORT (RENDER SAFE) ================= */
-
 const PORT = process.env.PORT || 8000;
+
+/* ================= RESEND ================= */
+
+const resend = new Resend(process.env.RESEND_API_KEY);
 
 /* ================= MIDDLEWARE ================= */
 
 app.use(
   cors({
     origin: [
-      "http://localhost:5173", // local frontend
-      "https://prabal-kumar-portfolio.netlify.app", // production frontend
+      "http://localhost:5173",
+      "https://prabal-kumar-portfolio.netlify.app",
     ],
   })
 );
 
 app.use(express.json());
-
-/* ================= EMAIL CONFIG ================= */
-
-const transporter = nodemailer.createTransport({
-  service: "gmail",
-  auth: {
-    user: process.env.EMAIL_USER,
-    pass: process.env.EMAIL_PASS,
-  },
-});
 
 /* ================= HEALTH ROUTE ================= */
 
@@ -63,33 +54,27 @@ app.post("/contact", async (req, res) => {
   try {
     /* ===== EMAIL TO YOU ===== */
 
-    await Promise.race([
-      transporter.sendMail({
-        from: `"${name} via Portfolio" <${process.env.EMAIL_USER}>`,
-        replyTo: email,
-        to: process.env.RECEIVER_EMAIL,
-        subject: `Portfolio Message from ${name}`,
-        text: `
+    await resend.emails.send({
+      from: "Portfolio Contact <onboarding@resend.dev>",
+      to: process.env.RECEIVER_EMAIL,
+      reply_to: email,
+      subject: `Portfolio Message from ${name}`,
+      text: `
 Name: ${name}
 Email: ${email}
 
 Message:
 ${message}
-        `,
-      }),
-      new Promise((_, reject) =>
-        setTimeout(() => reject(new Error("Mail timeout")), 15000)
-      ),
-    ]);
+      `,
+    });
 
     /* ===== AUTO REPLY TO USER ===== */
 
-    await Promise.race([
-      transporter.sendMail({
-        from: `"Prabal Kumar" <${process.env.EMAIL_USER}>`,
-        to: email,
-        subject: "Thanks for reaching out 👋",
-        text: `
+    await resend.emails.send({
+      from: "Prabal Kumar <onboarding@resend.dev>",
+      to: email,
+      subject: "Thanks for reaching out 👋",
+      text: `
 Hi ${name},
 
 Thanks for contacting me! I’ve received your message and will get back to you soon.
@@ -100,16 +85,12 @@ Here’s a copy of your message:
 
 Best regards,
 Prabal Kumar
-        `,
-      }),
-      new Promise((_, reject) =>
-        setTimeout(() => reject(new Error("Mail timeout")), 15000)
-      ),
-    ]);
+      `,
+    });
 
     res.json({ success: true });
   } catch (error) {
-    console.error("Mail error:", error.message);
+    console.error("Resend error:", error);
 
     res.status(500).json({
       success: false,
